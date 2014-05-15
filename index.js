@@ -466,25 +466,12 @@ Observer.prototype.getMaster  = function () {
   return getMaster(this.cluster);
 };
 
-function DataObserver(basePath) {
-  Monitor.call(this);
-
-  this.basePath = basePath;
-
-  _watchData(this.basePath, this);
-}
-util.inherits(DataObserver, Monitor);
-
 module.exports.init = init;
 module.exports.isMaster = isMaster; 
 module.exports.getMaster = getMaster;
 module.exports.getConfig = getConfig;
 module.exports.monitor = mainMonitor;
 module.exports.Observer = Observer;
-module.exports.DataObserver = DataObserver;
-module.exports.createNode = createNode;
-module.exports.removeNode = removeNode;
-module.exports.CreateMode = zookeeper.CreateMode;
 
 var appName = process.argv[1] && PATH.basename(process.argv[1]);
 if (appName === PATH.basename(__filename)) {
