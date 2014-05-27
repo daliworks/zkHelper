@@ -299,7 +299,23 @@ function init(opt, cb) {
     logger.info('on connected');
     async.series([
       function (done) {
-
+        logger.debug('0. create base nodes if not exists');
+        client.exists(BASE_PATH, function (err, stat) {
+          if (err || stat) { //already exists or error
+            return done(err);
+          }
+          client.mkdirp(BASE_PATH + '/nodes', zookeeper.CreateMode.PERSISTENT, function (err) {
+            if (err) { return done(err); }
+            logger.debug('created nodes/');
+            client.mkdirp(BASE_PATH + '/votes', zookeeper.CreateMode.PERSISTENT, function (err) {
+              if (err) { return done(err); }
+              logger.debug('created votes/');
+              return done();
+            });
+          });
+        });
+      },
+      function (done) {
         logger.debug('1. create client node');
         createNode(nodePath, zookeeper.CreateMode.EPHEMERAL, function (err, path) {
           if (!err && path) {
@@ -309,7 +325,6 @@ function init(opt, cb) {
         });
       },
       function (done) {
-
         logger.debug('2. create vote node');
         createNode(TICKET_PATH, zookeeper.CreateMode.EPHEMERAL_SEQUENTIAL, 
           new Buffer(PATH.basename(nodePath)), // node name
