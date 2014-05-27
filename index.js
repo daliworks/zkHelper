@@ -260,6 +260,8 @@ function getConfig() {
  *  configPath: optional, 
  *  clientOptions: zookeeper client options
  *  observerOnly: false(default), true: no voting, read status change only
+ *
+ * callback: err, client(created zk client)
  */
 function init(opt, cb) {
 
@@ -293,7 +295,7 @@ function init(opt, cb) {
   client.once('connected', function () {
     if (mainCluster.observerOnly) { 
       logger.info('on connected in observerOnly mode');
-      return cb(); 
+      return cb(null, client); 
     }
 
     logger.info('on connected');
@@ -445,7 +447,7 @@ function init(opt, cb) {
         logger.warn('[%s] init done', isMaster() ? 'MASTER' : 'SLAVE');
         logger.info('mainCluster', JSON.stringify(mainCluster, null, 2));
       }
-      return cb(err);
+      return cb(err, client);
     });
   });
 
