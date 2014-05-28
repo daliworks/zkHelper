@@ -89,39 +89,59 @@ function createNode(path, mode, data, cb) {
     cb = data;
     data = undefined;
   }
-  client.create(path, mode, data, function (err, rtnPath) {
-    if (!err) { // persistent or sequential
-      logger.debug('created ' + rtnPath);
-      return cb && cb(err, rtnPath);
-    } else if (err.getCode() === zookeeper.Exception.NODE_EXISTS) { //only ephermeral
-      if (zookeeper.CreateMode.EPHEMERAL === mode) {
-        client.transaction().
-        remove(path).
-        create(path, mode).
-        commit(function (err, txnResults) {
-          rtnPath = txnResults && txnResults[1] && txnResults[1].path;
-          if (err) {
-            logger.error('re-create error=', err);
-          } 
-          logger.debug('re-created ' + rtnPath + ' txnResults=', txnResults);
-          return cb && cb(err, rtnPath);
-        });
-      } else { //zookeeper.CreateMode.PERSISTENT
-        if (data) {
-          client.setData(path, data, -1, function (err) {
-            if (err) {
-              logger.error('[setData] err', err);
-            }
-            return cb && cb(err, path);
-          });
-        } else {
-          return cb && cb(undefined, path);
+
+  var dirname = PATH.dirname(path);
+  async.waterfall([
+    function (done) {//create if not exists
+      client.exists(dirname, function (err, stat) {
+        if (err || stat) { //already exists or error
+          return done(err);
         }
-      }
-    } else {
-      logger.error('created ' + path + ' error=', err);
-      return cb && cb(err, rtnPath);
+        client.mkdirp(dirname, zookeeper.CreateMode.PERSISTENT, function (err) {
+          if (err) { return done(err); }
+          logger.debug('created nodes/');
+          return done();
+        });
+      });
+    },
+    function (done) {
+      client.create(path, mode, data, function (err, rtnPath) {
+        if (!err) { // persistent or sequential
+          logger.debug('created ' + rtnPath);
+          return done(err, rtnPath);
+        } else if (err.getCode() === zookeeper.Exception.NODE_EXISTS) { //only ephermeral
+          if (zookeeper.CreateMode.EPHEMERAL === mode) {
+            client.transaction().
+            remove(path).
+            create(path, mode).
+            commit(function (err, txnResults) {
+              rtnPath = txnResults && txnResults[1] && txnResults[1].path;
+              if (err) {
+                logger.error('re-create error=', err);
+              }
+              logger.debug('re-created ' + rtnPath + ' txnResults=', txnResults);
+              return done(err, rtnPath);
+            });
+          } else { //zookeeper.CreateMode.PERSISTENT
+            if (data) {
+              client.setData(path, data, -1, function (err) {
+                if (err) {
+                  logger.error('[setData] err', err);
+                }
+                return done(err, path);
+              });
+            } else {
+              return done(undefined, path);
+            }
+          }
+        } else {
+          logger.error('created ' + path + ' error=', err);
+          return done(err, rtnPath);
+        }
+      });
     }
+  ], function (err, rtnPath) {
+    return cb && cb(err, rtnPath);
   });
 }
 
@@ -300,23 +320,6 @@ function init(opt, cb) {
 
     logger.info('on connected');
     async.series([
-      function (done) {
-        logger.debug('0. create base nodes if not exists');
-        client.exists(BASE_PATH, function (err, stat) {
-          if (err || stat) { //already exists or error
-            return done(err);
-          }
-          client.mkdirp(BASE_PATH + '/nodes', zookeeper.CreateMode.PERSISTENT, function (err) {
-            if (err) { return done(err); }
-            logger.debug('created nodes/');
-            client.mkdirp(BASE_PATH + '/votes', zookeeper.CreateMode.PERSISTENT, function (err) {
-              if (err) { return done(err); }
-              logger.debug('created votes/');
-              return done();
-            });
-          });
-        });
-      },
       function (done) {
         logger.debug('1. create client node');
         createNode(nodePath, zookeeper.CreateMode.EPHEMERAL, function (err, path) {
