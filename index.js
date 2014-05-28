@@ -454,20 +454,22 @@ function init(opt, cb) {
   client.connect();
 }
 
-function Observer(basePath) {
+//basePath or options: basePath, dataOnly(default false)
+function Observer(basePathOrOption) {
   Monitor.call(this);
 
-  var self = this;
-  this.basePath = basePath;
+  var self = this,
+    dataOnly = false;
+
+  if (_.isObject(basePathOrOption)) {
+    this.basePath = basePathOrOption.basePath;
+    dataOnly = !!basePathOrOption.dataOnly;
+  } else {
+    this.basePath = basePathOrOption;
+  }
+
   this.cluster = {};
 
-  this.on('children', function (path, newVal/*, diff*/) {
-    if (_.contains(path, self.basePath)) {
-      self.cluster[PATH.basename(path)] = newVal;
-    } else {
-      logger.error('on children: unknown [%s]=%s', path, newVal.toString());
-    }
-  });
   this.on('data', function (path, newVal/*, oldVal*/) {
     if (path === self.basePath) {
       self.cluster.master = newVal.master;
@@ -475,7 +477,21 @@ function Observer(basePath) {
       logger.error('on data: unknown [%s]=%s', path, JSON.stringify(newVal));
     }
   });
-  watchAll(this.basePath, this, true /*ObserverOnly*/);
+
+  if (dataOnly) {
+    _watchData(this.basePath, this);
+    return;
+  } else {
+    this.on('children', function (path, newVal/*, diff*/) {
+      if (_.contains(path, self.basePath)) {
+        self.cluster[PATH.basename(path)] = newVal;
+      } else {
+        logger.error('on children: unknown [%s]=%s', path, newVal.toString());
+      }
+    });
+    watchAll(this.basePath, this, true /*ObserverOnly*/);
+    return;
+  }
 }
 util.inherits(Observer, Monitor);
 
