@@ -11,7 +11,6 @@ var BASE_PATH, CONFIG_PATH, TICKET_PATH,
     logger = console;
 
 var exitCode = -1, 
-    _underRestarting = false,
     mainCluster = {},
     mainMonitor,
     client;// zookeeper client
@@ -38,9 +37,6 @@ function isMaster() {
 }
 
 function appRestart(code, msg) {
-  if (_underRestarting) {
-    return;
-  }
 
   logger.warn('[appRestart] code=%s err=%s', code, msg);
 
@@ -58,7 +54,6 @@ function appRestart(code, msg) {
             client.getState());
 
         exitCode = code ? code : 0;
-        _underRestarting = true;
         if (client) {
           client.close();//redundant call on disconnect should be ok.
         }
@@ -67,7 +62,6 @@ function appRestart(code, msg) {
     }, 5000); // after two ticks
   } else {
     exitCode = code ? code : 0;
-    _underRestarting = true;
     if (client) {
       client.close();//redundant call on disconnect should be ok.
     }
@@ -274,14 +268,32 @@ function getConfig() {
 
 /* 
  * option:
- *  basePath: zk basePath
- *  node: host [':' + port]
+ *  basePath: zk basePath, optional if observerOnly
+ *  node: host [':' + port], optional if observerOnly
  *  servers: zookeeper servers
  *  configPath: optional, 
+ *  logger: console(default)
  *  clientOptions: zookeeper client options
  *  observerOnly: false(default), true: no voting, read status change only
  *
  * callback: err, client(created zk client)
+ *
+ * Example:
+ * var zk = require('zkHelper'),
+ * options = {
+ *  basePath: '/myapp';
+ *  configPath: '/myapp/config',
+ *  node: require('os').hostname(),
+ *  servers: ['zk0:2181', 'zk1:2181', 'zk2:2181'], // zk servers
+ *  clientOptons: {
+ *    sessionTimeout: 10000,
+ *    retries: 3
+ *  }
+ * };
+ * zk.init(options, function (err, zkClient) {
+ *   // do something
+ * });
+ *  
  */
 function init(opt, cb) {
 
@@ -529,7 +541,7 @@ if (appName === PATH.basename(__filename)) {
       logger.info('zk init done');
     }
     if (opt.observerOnly === true) {
-      var observer = new Observer('/ving.daliworks.net/main');
+      var observer = new Observer('/otherApp');
       observer.on('children', function (path, newVal, diff) {
         logger.info('Master=%j', observer.getMaster());
         logger.info('[%s] children:[%s] added=[%s] deleted=[%s]', path, newVal, diff.added, diff.deleted);
