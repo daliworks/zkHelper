@@ -1,7 +1,7 @@
 zkHelper
 ========
 
-leader selection. observe node change, and configuration change etc.
+Zookeeper helper utility for leader election, observe node change, and configuration change etc. 
 
 For instance  
    - init() options:
@@ -86,6 +86,11 @@ options = {
 ```
 
 #observer mode
+
+ - init() with ```options.observerOnly``` : true
+ - Do not participate in leader election, and observe status changes only.
+ - data event is for master selection info. children event for node list changes.
+
 
 ## event
 ### on('data', path, newVal, oldValue)
