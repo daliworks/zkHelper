@@ -47,7 +47,7 @@ zookeeper nodes structure looks like:
      *  observerOnly: false(default), true: no voting, read status change only
    * callback: err, client(created zk client)
 
-# master selection mode(default)
+# master election mode(default)
 
 ## getMaster()
   * returns current master.
@@ -89,7 +89,7 @@ options = {
 
  - init() with ```options.observerOnly``` : true
  - Do not participate in leader election, and observe status changes only.
- - data event is for master selection info. children event for node list changes.
+ - data event is for master info. children event for node list changes.
 
 
 ## event
