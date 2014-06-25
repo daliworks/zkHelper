@@ -29,7 +29,7 @@ zookeeper nodes structure looks like:
 
  - On master change, every apps(including the master) participated in this leader
  election will restart.
- The master will not be changed after restart.
+ The master will not be changed when restarted within zookeeper sessionTimeout.
 
  - Any connection failure to zookeeper leads process.exit()
    - A temporary disconnection is ignored one time and check
