@@ -274,7 +274,10 @@ function getConfig() {
  *  configPath: optional, 
  *  logger: console(default)
  *  clientOptions: zookeeper client options
- *  observerOnly: false(default), true: no voting, read status change only
+ *  observerOnly: false(default), 
+ *                true: no voting, read status change only
+ *                  - watch node if basePath exists
+ *                  - watch config data if configPath exists
  *
  * callback: err, client(created zk client)
  *
@@ -309,8 +312,11 @@ function init(opt, cb) {
   TICKET_PATH = BASE_PATH + '/votes/n_';
   logger = opt.logger ? opt.logger : console;
 
-  var nodePath = BASE_PATH + '/nodes/' + opt.node,
-  masterAfterInit;
+  var nodePath, masterAfterInit;
+
+  if (BASE_PATH && opt.node) {
+    nodePath = BASE_PATH + '/nodes/' + opt.node;
+  }
 
   mainCluster.observerOnly = opt.observerOnly ? true : false;
   logger.info('Connecting ZooKeeper Server', JSON.stringify(opt.servers));
@@ -325,15 +331,15 @@ function init(opt, cb) {
   });
 
   client.once('connected', function () {
-    if (mainCluster.observerOnly) { 
-      logger.info('on connected in observerOnly mode');
-      return cb(null, client); 
-    }
-
     logger.info('on connected');
     async.series([
       function (done) {
-        logger.debug('1. create client node');
+        if (nodePath) {
+          logger.debug('1. create client node');
+        } else {
+          logger.debug('1. create client node: skip due to missing basePath or node');
+          return done();
+        }
         createNode(nodePath, zookeeper.CreateMode.EPHEMERAL, function (err, path) {
           if (!err && path) {
             mainCluster.node = path;
@@ -342,6 +348,11 @@ function init(opt, cb) {
         });
       },
       function (done) {
+        if (mainCluster.observerOnly) { 
+          logger.debug('2. create vote node : skip in observerOnly mode');
+          return done(); 
+        }
+
         logger.debug('2. create vote node');
         createNode(TICKET_PATH, zookeeper.CreateMode.EPHEMERAL_SEQUENTIAL, 
           new Buffer(PATH.basename(nodePath)), // node name
@@ -354,25 +365,20 @@ function init(opt, cb) {
       },
       function (done) {
         logger.debug('3. start watch');
+        if (!BASE_PATH) {
+          logger.debug('skip watchAll() on missing basePath');
+          return done();
+        }
         mainMonitor.on('children', function (path, newVal/*, diff*/) {
-          if (_.contains(path, BASE_PATH)) {
+          if (BASE_PATH && _.contains(path, BASE_PATH)) {
             mainCluster[PATH.basename(path)] = newVal;
           } else {
             logger.error('on children: unknown [%s]=%s', path, newVal.toString());
           }
         });
         mainMonitor.on('data', function (path, newVal, oldVal) {
-          if (path === BASE_PATH) {
+          if (BASE_PATH && path === BASE_PATH) {
             mainCluster.master = newVal.master;
-          } else if (CONFIG_PATH && path === CONFIG_PATH) {
-            if (oldVal) {
-              setTimeout(function () { process.exit(1); }, 1000);
-              logger.fatal('Restart on zk config change, newval=', newVal);
-            } else {
-              mainCluster.config = newVal;
-            }
-          } else {
-            logger.error('on data: unknown [%s]=%s', path, JSON.stringify(newVal));
           }
         });
 
@@ -380,15 +386,31 @@ function init(opt, cb) {
       },
       function (done) {
         logger.debug('3.5. start watch config');
-        if (CONFIG_PATH) {
-          _watchData(CONFIG_PATH, mainMonitor, done);
-        } else {
-          done();
+        if (!CONFIG_PATH) {
+          logger.debug('skip _watchData(config) on missing configPath');
+          return done();
         }
+        
+        mainMonitor.on('data', function (path, newVal, oldVal) {
+          if (CONFIG_PATH && path === CONFIG_PATH) {
+            if (oldVal) {
+              setTimeout(function () { process.exit(1); }, 1000);
+              logger.fatal('Restart on zk config change, newval=', newVal);
+            } else {
+              mainCluster.config = newVal;
+            }
+          }
+        });
+
+        _watchData(CONFIG_PATH, mainMonitor, done);
       },
       function (done) {
-        logger.debug('4. wait or be a master');
+        if (mainCluster.observerOnly) { 
+          logger.debug('4. wait or be a master: skip in observerOnly mode');
+          return done(); 
+        }
 
+        logger.debug('4. wait or be a master');
         function _waitMaster() {
           function __doneRemoveListener(err) {
             mainMonitor.removeListener('children', _waitMaster);
@@ -430,6 +452,10 @@ function init(opt, cb) {
         _waitMaster();
       },
       function (done) {
+        if (mainCluster.observerOnly) { 
+          logger.debug('5. listen master change: skip in observerOnly mode');
+          return done(); 
+        }
         logger.debug('5. listen master change');
 
         masterAfterInit = getMaster();
@@ -459,7 +485,11 @@ function init(opt, cb) {
         logger.error('init error', err);
         appRestart(-1, 'init error'); // restart
       } else {
-        logger.warn('[%s] init done', isMaster() ? 'MASTER' : 'SLAVE');
+        if (mainCluster.observerOnly) {
+          logger.warn('[%s] init done', 'OBSERVER');
+        } else {
+          logger.warn('[%s] init done', isMaster() ? 'MASTER' : 'SLAVE');
+        }
         logger.info('mainCluster', JSON.stringify(mainCluster, null, 2));
       }
       return cb(err, client);
@@ -521,8 +551,7 @@ module.exports.getConfig = getConfig;
 module.exports.monitor = mainMonitor;
 module.exports.Observer = Observer;
 
-var appName = process.argv[1] && PATH.basename(process.argv[1]);
-if (appName === PATH.basename(__filename)) {
+if (require.main === module) { // run directly from node
   var opt = {};
   if (process.argv[2] === '-o') {
     opt.node = 'observer';
