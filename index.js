@@ -271,7 +271,8 @@ function getConfig() {
  *  basePath: zk basePath, optional if observerOnly
  *  node: host [':' + port], optional if observerOnly
  *  servers: zookeeper servers
- *  configPath: optional, 
+ *  configPath: optional 
+ *  noRestartOnConfigChange: default false
  *  logger: console(default)
  *  clientOptions: zookeeper client options
  *  observerOnly: false(default), 
@@ -393,7 +394,8 @@ function init(opt, cb) {
         
         mainMonitor.on('data', function (path, newVal, oldVal) {
           if (CONFIG_PATH && path === CONFIG_PATH) {
-            if (oldVal) {
+            logger.warn('config change=', newVal, oldVal);
+            if (oldVal && !opt.noRestartOnConfigChange) {
               setTimeout(function () { process.exit(1); }, 1000);
               logger.fatal('Restart on zk config change, newval=', newVal);
             } else {

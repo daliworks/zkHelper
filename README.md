@@ -41,7 +41,8 @@ zookeeper nodes structure looks like:
      *  basePath: zk basePath, optional if observerOnly
      *  node: host [':' + port], optional if observerOnly
      *  servers: zookeeper servers
-     *  configPath: optional,
+     *  configPath: optional
+     *  noRestartOnConfigChange: optional, default false
      *  logger: console(default)
      *  clientOptions: zookeeper client options
      *  observerOnly: false(default), true: no voting, read status change only
