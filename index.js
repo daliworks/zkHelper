@@ -394,7 +394,7 @@ function init(opt, cb) {
         
         mainMonitor.on('data', function (path, newVal, oldVal) {
           if (CONFIG_PATH && path === CONFIG_PATH) {
-            logger.warn('config change=', newVal, oldVal);
+            //logger.warn('config change=', newVal, oldVal);
             if (oldVal && !opt.noRestartOnConfigChange) {
               setTimeout(function () { process.exit(1); }, 1000);
               logger.fatal('Restart on zk config change, newval=', newVal);
