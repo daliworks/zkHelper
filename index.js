@@ -262,6 +262,13 @@ function getMaster(cluster) {
   return;
 }
 
+function getNodes(cluster) {
+  if (!cluster) {
+    cluster = mainCluster;
+  }
+  return cluster.nodes;
+}
+
 function getConfig() {
   return mainCluster.config;
 }
@@ -549,9 +556,14 @@ Observer.prototype.getMaster  = function () {
 module.exports.init = init;
 module.exports.isMaster = isMaster; 
 module.exports.getMaster = getMaster;
+module.exports.getNodes = getNodes;
 module.exports.getConfig = getConfig;
 module.exports.monitor = mainMonitor;
 module.exports.Observer = Observer;
+module.exports.createNode = createNode;
+module.exports.removeNode = removeNode;
+module.exports.CreateMode = zookeeper.CreateMode;
+module.exports.Exception = zookeeper.Exception;
 
 if (require.main === module) { // run directly from node
   var opt = {};
