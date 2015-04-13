@@ -262,6 +262,16 @@ function getMaster(cluster) {
   return;
 }
 
+function getSlaves(cluster) {
+  var master;
+  if (!cluster) {
+    cluster = mainCluster;
+  }
+  master = getMaster(cluster);
+
+  return _.difference(cluster.nodes, [master]);
+}
+
 function getNodes(cluster) {
   if (!cluster) {
     cluster = mainCluster;
@@ -553,9 +563,18 @@ Observer.prototype.getMaster  = function () {
   return getMaster(this.cluster);
 };
 
+Observer.prototype.getSlaves  = function () {
+  return getSlaves(this.cluster);
+};
+
+Observer.prototype.getNodes  = function () {
+  return getNodes(this.cluster);
+};
+
 module.exports.init = init;
 module.exports.isMaster = isMaster; 
 module.exports.getMaster = getMaster;
+module.exports.getSlaves = getSlaves;
 module.exports.getNodes = getNodes;
 module.exports.getConfig = getConfig;
 module.exports.monitor = mainMonitor;
