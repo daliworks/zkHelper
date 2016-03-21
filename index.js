@@ -349,7 +349,7 @@ function init(opt, cb) {
   });
 
   client.once('connected', function () {
-    logger.info('on connected');
+    logger.info('on connected, session id =', client.getSessionId());
     async.series([
       function (done) {
         if (nodePath) {
