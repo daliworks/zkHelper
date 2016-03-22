@@ -45,19 +45,19 @@ function appRestart(code, msg) {
 
     setTimeout(function () {
       if (client.getState() === zookeeper.State.SYNC_CONNECTED) {
-        logger.info('[appRestart] disconnected from the zookeeper server but reconnected, code = ',
+        logger.info('[appRestart] disconnected from the zookeeper server but reconnected, state = ',
             client.getState(), ', session id = ', client.getSessionId());
 
         return;
       } else {
-        logger.warn('[appRestart] disconnected from the zookeeper server and not reconnected, code = ',
+        logger.warn('[appRestart] disconnected from the zookeeper server and not reconnected, state = ',
             client.getState());
 
         exitCode = code ? code : 0;
         if (client) {
           client.close();//redundant call on disconnect should be ok.
         }
-        setTimeout(function () { process.exit(0); }, 1000);
+        setTimeout(function () { logger.info('[appRestart] disconnected / process.exit(0)'); process.exit(0); }, 1000);
       }
     }, 5000); // after two ticks
   } else {
@@ -65,7 +65,7 @@ function appRestart(code, msg) {
     if (client) {
       client.close();//redundant call on disconnect should be ok.
     }
-    setTimeout(function () { process.exit(0); }, 1000);
+    setTimeout(function () { logger.info('[appRestart] process.exit(0)', code); process.exit(0); }, 1000);
   }
 }
 
@@ -341,7 +341,7 @@ function init(opt, cb) {
   client = zookeeper.createClient(opt.servers.join(','), opt.clientOptions);
 
   _.each(['expired', 'error', 'disconnected', 'authenticationFailed'], function (eventName) {
-    client.on(eventName, appRestart.bind(-1, eventName, 'expired, error or disconnected'));
+    client.on(eventName, appRestart.bind(null, eventName, 'expired, error or disconnected'));
   });
 
   client.on('state', function (state) {
