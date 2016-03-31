@@ -57,7 +57,7 @@ function appRestart(code, msg) {
         if (client) {
           client.close();//redundant call on disconnect should be ok.
         }
-        setTimeout(function () { logger.info('[appRestart] disconnected / process.exit(0)'); process.exit(0); }, 1000);
+        setTimeout(function () { logger.warn('[appRestart] disconnected / process.exit'); process.exit(0); }, 1000);
       }
     }, 5000); // after two ticks
   } else {
@@ -65,7 +65,7 @@ function appRestart(code, msg) {
     if (client) {
       client.close();//redundant call on disconnect should be ok.
     }
-    setTimeout(function () { logger.info('[appRestart] process.exit(0)', code); process.exit(0); }, 1000);
+    setTimeout(function () { logger.warn('[appRestart] process.exit :', code); process.exit(0); }, 1000);
   }
 }
 
@@ -413,7 +413,7 @@ function init(opt, cb) {
           if (CONFIG_PATH && path === CONFIG_PATH) {
             //logger.warn('config change=', newVal, oldVal);
             if (oldVal && !opt.noRestartOnConfigChange) {
-              setTimeout(function () { process.exit(1); }, 1000);
+              setTimeout(function () { logger.warn('[appRestart] zk change / process.exit'); process.exit(0); }, 1000);
               logger.fatal('Restart on zk config change, newval=', newVal);
             } else {
               mainCluster.config = newVal;
