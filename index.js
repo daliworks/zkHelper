@@ -59,7 +59,7 @@ function appRestart(code, msg) {
         }
         setTimeout(function () { logger.warn('[appRestart] disconnected / process.exit'); process.exit(0); }, 1000);
       }
-    }, 5000); // after two ticks
+    }, 20 * 1000); // after 8 ticks
   } else {
     exitCode = code ? code : 0;
     if (client) {
