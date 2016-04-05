@@ -10,7 +10,8 @@ var events = require('events'),
 var BASE_PATH, CONFIG_PATH, TICKET_PATH, 
     logger = console;
 
-var exitCode = -1, 
+var isInitialized = false,
+    exitCode = -1,
     mainCluster = {},
     mainMonitor,
     client;// zookeeper client
@@ -38,20 +39,20 @@ function isMaster() {
 
 function appRestart(code, msg) {
 
-  logger.warn('[appRestart] code=%s err=%s', code, msg);
+  logger.warn('[appRestart] isInitialized=%s code=%s err=%s', isInitialized, code, msg);
 
   if (client && code === 'disconnected') {
     logger.info('[appRestart] Disconnected - session id = ', client.getSessionId());
 
     setTimeout(function () {
-      if (client.getState() === zookeeper.State.SYNC_CONNECTED) {
+      if (isInitialized && client.getState() === zookeeper.State.SYNC_CONNECTED) {
         logger.info('[appRestart] disconnected from the zookeeper server but reconnected, state = ',
-            client.getState(), ', session id = ', client.getSessionId());
+            client.getState(), ', session id = ', client.getSessionId(), ', isInitialized =', isInitialized);
 
         return;
       } else {
         logger.warn('[appRestart] disconnected from the zookeeper server and not reconnected, state = ',
-            client.getState());
+            client.getState(), ', isInitialized =', isInitialized);
 
         exitCode = code ? code : 0;
         if (client) {
@@ -504,6 +505,7 @@ function init(opt, cb) {
         logger.error('init error', err);
         appRestart(-1, 'init error'); // restart
       } else {
+        isInitialized = true;
         if (mainCluster.observerOnly) {
           logger.warn('[%s] init done', 'OBSERVER');
         } else {
