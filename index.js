@@ -10,7 +10,7 @@ var events = require('events'),
 var BASE_PATH, CONFIG_PATH, TICKET_PATH, 
     logger = console;
 
-var isInitialized = false,
+var zkStatus = 'none',// 'initialized', 'deinitialized'
     exitCode = -1,
     mainCluster = {},
     mainMonitor,
@@ -38,27 +38,31 @@ function isMaster() {
 }
 
 function appRestart(code, msg) {
+  if (zkStatus === 'deinitialized') {
+    logger.warn('[appRestart] not appRestart due to zkStatus=deinitialized / code=%s err=%s', code, msg);
+    return;
+  }
 
-  logger.warn('[appRestart] isInitialized=%s code=%s err=%s', isInitialized, code, msg);
+  logger.warn('[appRestart] zkStatus=%s code=%s err=%s', zkStatus, code, msg);
 
   if (client && code === 'disconnected') {
     logger.info('[appRestart] Disconnected - session id = ', client.getSessionId());
 
     setTimeout(function () {
-      if (isInitialized && client.getState() === zookeeper.State.SYNC_CONNECTED) {
+      if (zkStatus === 'initialized' && client.getState() === zookeeper.State.SYNC_CONNECTED) {
         logger.info('[appRestart] disconnected from the zookeeper server but reconnected, state = ',
-            client.getState(), ', session id = ', client.getSessionId(), ', isInitialized =', isInitialized);
+            client.getState(), ', session id = ', client.getSessionId(), ', zkStatus =', zkStatus);
 
         return;
       } else {
         logger.warn('[appRestart] disconnected from the zookeeper server and not reconnected, state = ',
-            client.getState(), ', isInitialized =', isInitialized);
+            client.getState(), ', zkStatus =', zkStatus);
 
         exitCode = code ? code : 0;
         if (client) {
           client.close();//redundant call on disconnect should be ok.
         }
-        setTimeout(function () { logger.warn('[appRestart] disconnected / process.exit'); process.exit(0); }, 1000);
+        process.kill(process.pid, 'SIGTERM');
       }
     }, 20 * 1000); // after 8 ticks
   } else {
@@ -66,7 +70,7 @@ function appRestart(code, msg) {
     if (client) {
       client.close();//redundant call on disconnect should be ok.
     }
-    setTimeout(function () { logger.warn('[appRestart] process.exit :', code); process.exit(0); }, 1000);
+    process.kill(process.pid, 'SIGTERM');
   }
 }
 
@@ -414,7 +418,7 @@ function init(opt, cb) {
           if (CONFIG_PATH && path === CONFIG_PATH) {
             //logger.warn('config change=', newVal, oldVal);
             if (oldVal && !opt.noRestartOnConfigChange) {
-              setTimeout(function () { logger.warn('[appRestart] zk change / process.exit'); process.exit(0); }, 1000);
+              appRestart(-1, 'zk config change');
               logger.fatal('Restart on zk config change, newval=', newVal);
             } else {
               mainCluster.config = newVal;
@@ -454,12 +458,12 @@ function init(opt, cb) {
             }
           } else { // it's master but not No.1
             if (getMaster() && mainCluster.master === PATH.basename(mainCluster.node)) {
-              logger.info('not No.1 but master, waiting...');
+              logger.info('not No.1 but master, waiting...', mainCluster);
               return;
             }
           }
           if (_.isEmpty(getMaster())) {
-            logger.info('[wait Master] NO MASTER, waiting...');
+            logger.info('[wait Master] NO MASTER, waiting...', mainCluster);
             return;
           } else {
             logger.info('[wait Master] FOUND MASTER %j', getMaster());
@@ -505,7 +509,7 @@ function init(opt, cb) {
         logger.error('init error', err);
         appRestart(-1, 'init error'); // restart
       } else {
-        isInitialized = true;
+        zkStatus = 'initialized';
         if (mainCluster.observerOnly) {
           logger.warn('[%s] init done', 'OBSERVER');
         } else {
@@ -518,6 +522,12 @@ function init(opt, cb) {
   });
 
   client.connect();
+}
+
+function deinit(cb) {
+  zkStatus = 'deinitialized';
+  client.close();
+  return cb && cb();
 }
 
 //basePath or options: basePath, dataOnly(default false)
@@ -574,6 +584,7 @@ Observer.prototype.getNodes  = function () {
 };
 
 module.exports.init = init;
+module.exports.deinit = deinit;
 module.exports.isMaster = isMaster; 
 module.exports.getMaster = getMaster;
 module.exports.getSlaves = getSlaves;
